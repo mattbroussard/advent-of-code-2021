@@ -34,8 +34,6 @@ def part1(table=read_input()):
   #  - 0: cost so far
   #  - 1: path so far as list of point tuples
   frontier = [(0, [start])]
-  # seen set is ok since there can never be a cheaper path than a direct adjacency (since a node's
-  # value is the weight for all inbound edges)
   seen = set([start])
   while len(frontier) > 0:
     cost, path = heapq.heappop(frontier)
@@ -54,6 +52,11 @@ def part1(table=read_input()):
         break
 
       heapq.heappush(frontier, new_entry)
+
+      # it's ok to consider things seen at enqueue time rather than dequeue since we are by definition
+      # at the cheapest point adjacent to n already and all inbound edges to n weigh the same. If this
+      # weren't true, we would need to consider other possible paths to n that appear in iterations before
+      # we dequeue n.
       seen.add(n)
 
   if solution is not None:
