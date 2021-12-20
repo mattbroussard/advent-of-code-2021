@@ -3,6 +3,8 @@
 
 import sys
 import json
+from copy import deepcopy
+
 from colors import colors
 
 def read_file():
@@ -186,7 +188,7 @@ def reduce_num(root):
         explode(root, ptr)
         any_exploded = True
 
-        print('after explode:  %s' % (stringify(root),))
+        # print('after explode:  %s' % (stringify(root),))
       ptr = next(root, ptr)
 
     # second pass: do any splits
@@ -197,7 +199,7 @@ def reduce_num(root):
         split(root, ptr)
         any_split = True
 
-        print('after split:    %s' % (stringify(root),))
+        # print('after split:    %s' % (stringify(root),))
 
         # if the split created an explodable pair, we need to return to the exploding step
         # if this proves too slow, maybe explode inline here?
@@ -211,10 +213,10 @@ def reduce_num(root):
   return root
 
 def add_nums(a, b):
-  added = [a, b]
-  print('after addition: %s' % (stringify(added),))
+  added = deepcopy([a, b])
+  # print('after addition: %s' % (stringify(added),))
   reduced = reduce_num(added)
-  print('after reduce:   %s' % (stringify(reduced),))
+  # print('after reduce:   %s' % (stringify(reduced),))
   return reduced
 
 def magnitude(num):
@@ -238,8 +240,25 @@ def part1():
   print(stringify(total))
   print(mag)
 
+def part2():
+  cur_max_magnitude = -1
+
+  nums = read_file()
+
+  for i in range(len(nums)):
+    for j in range(len(nums)):
+      if i == j:
+        continue
+
+      added = add_nums(nums[i], nums[j])
+      mag = magnitude(added)
+      cur_max_magnitude = max(mag, cur_max_magnitude)
+
+  print(cur_max_magnitude)
+
 def main():
   part1()
+  part2()
 
 if __name__ == '__main__':
   main()
