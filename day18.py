@@ -114,10 +114,10 @@ def depth(ptr):
 def explode(root, ptr):
   v = get(root, ptr)
   if not isinstance(v, list):
-    raise Error('invalid call to explode')
+    raise Exception('invalid call to explode')
   a, b = v
   if not isinstance(a, int) or not isinstance(b, int):
-    raise Error('invalid call to explode')
+    raise Exception('invalid call to explode')
 
   # print(' - next: exploding %s at %s' % (v, ptr))
 
@@ -149,7 +149,7 @@ def explode(root, ptr):
 def split(root, ptr):
   v = get(root, ptr)
   if not isinstance(v, int):
-    raise Error('invalid call to split')
+    raise Exception('invalid call to split')
 
   a = v // 2
   b = v - a

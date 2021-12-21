@@ -115,7 +115,7 @@ def compute_packet_value(packet):
     a, b = (compute_packet_value(child) for child in packet.children)
     return 1 if a == b else 0
   else:
-    raise Error('unknown packet type')
+    raise Exception('unknown packet type')
 
 def part2():
   data = read_file()
