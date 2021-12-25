@@ -15,7 +15,7 @@ def read_file():
     match = regexp.search(line)
     if match:
       nums = [int(match.group(i)) for i in range(2,8)]
-      # TODO: need to add 1 to upper bounds here since problem description is in
+      # Need to add 1 to upper bounds here since problem description is in
       # terms of inclusive points,
       # not exclusive ranges
       nums = tuple(n + (1 if i % 2 == 1 else 0) for i, n in enumerate(nums))
@@ -23,9 +23,11 @@ def read_file():
       yield on, nums
 
 def is_initialization_cube(cube):
-  for n in cube:
-    if n < -50 or n > 50:
-      return False
+  x1, x2, y1, y2, z1, z2 = cube
+  if x1 < -50 or y1 < -50 or z1 < -50:
+    return False
+  if x2 > 51 or y2 > 51 or z2 > 51:
+    return False
   return True
 
 def volume(cube):
@@ -86,7 +88,7 @@ def intersect_1d(x1, x2, x3, x4):
 def part1(should_filter=True):
   file_contents = read_file()
   augmented = [t + (i,) for i, t in enumerate(file_contents)]
-  input_cubes = [c for c in augmented if is_initialization_cube(c[1])]
+  input_cubes = [c for c in augmented if not should_filter or is_initialization_cube(c[1])]
 
   on_cubes = []
 
@@ -119,15 +121,14 @@ def part1(should_filter=True):
       if on == 'on':
         on_cubes.append(cube)
 
-    print("after line %.3f: %d" % (input_idx, sum(volume(c) for c in on_cubes)))
+    # print("after line %.3f: %d" % (input_idx, sum(volume(c) for c in on_cubes)))
 
   total_on = sum(volume(c) for c in on_cubes)
 
   print(total_on)
 
 def part2():
-  pass
-  # part1(False)
+  part1(False)
 
 def main():
   part1()
