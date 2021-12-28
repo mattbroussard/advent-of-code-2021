@@ -1,0 +1,215 @@
+p = w != (z % 26) + B
+z = (26 if p else 1) * (z / A) + (w + C if p else 0)
+
+"!p && z == 0 -> z = 0"
+
+round 0, w=9, z=18
+round 1, w=9, z=
+
+---
+
+x = (z % 26) + B
+x = x != w
+
+y = x * 25 + 1     # y = 26 if x != w else 1
+z = (z / A) * y
+
+y = w + C
+y *= x
+
+z += y
+
+----
+
+w is new digit
+x starts 0
+z result from previous digit (& final result); starts at 0
+
+x = (z % 26)
+z /= A
+x += B
+x = x != w
+
+y = x * 25 + 1
+z *= y
+
+y = w + C
+y *= x
+
+z += y
+
+i =  0    1    2    3    4    5    6     7    8    9   10    11   12   13
+A = [1,   1,   1,  26,  26,   1,   1,   26,   1,  26,   1,   26,  26,  26]
+B = [12, 12,  12,  -9,  -9,  14,  14,  -10,  15,  -2,  11,  -15,  -9,  -3]
+C = [9,   4,   2,   5,   1,   6,  11,   15,   7,  12,  15,    9,  12,  12]
+
+    inp w
+    mul x 0     mul x 0      mul x 0      mul x 0     mul x 0    mul x 0
+    add x z     add x z      add x z      add x z     add x z    add x z
+    mod x 26    mod x 26     mod x 26     mod x 26    mod x 26   mod x 26
+*A  div z 1     div z 1      div z 1      div z 26    div z 26   div z 1
+*B  add x 12    add x 12     add x 12     add x -9    add x -9   add x 14
+    eql x w     eql x w      eql x w      eql x w     eql x w    eql x w
+    eql x 0     eql x 0      eql x 0      eql x 0     eql x 0    eql x 0
+    mul y 0     mul y 0      mul y 0      mul y 0     mul y 0    mul y 0
+    add y 25    add y 25     add y 25     add y 25    add y 25   add y 25
+    mul y x     mul y x      mul y x      mul y x     mul y x    mul y x
+    add y 1     add y 1      add y 1      add y 1     add y 1    add y 1
+    mul z y     mul z y      mul z y      mul z y     mul z y    mul z y
+    mul y 0     mul y 0      mul y 0      mul y 0     mul y 0    mul y 0
+    add y w     add y w      add y w      add y w     add y w    add y w
+*C  add y 9     add y 4      add y 2      add y 5     add y 1    add y 6
+    mul y x     mul y x      mul y x      mul y x     mul y x    mul y x
+    add z y     add z y      add z y      add z y     add z y    add z y
+
+inp w
+mul x 0
+add x z
+mod x 26
+div z 1
+add x 14
+eql x w
+eql x 0
+mul y 0
+add y 25
+mul y x
+add y 1
+mul z y
+mul y 0
+add y w
+add y 11
+mul y x
+add z y
+
+inp w
+mul x 0
+add x z
+mod x 26
+div z 26
+add x -10
+eql x w
+eql x 0
+mul y 0
+add y 25
+mul y x
+add y 1
+mul z y
+mul y 0
+add y w
+add y 15
+mul y x
+add z y
+
+inp w
+mul x 0
+add x z
+mod x 26
+div z 1
+add x 15
+eql x w
+eql x 0
+mul y 0
+add y 25
+mul y x
+add y 1
+mul z y
+mul y 0
+add y w
+add y 7
+mul y x
+add z y
+
+inp w
+mul x 0
+add x z
+mod x 26
+div z 26
+add x -2
+eql x w
+eql x 0
+mul y 0
+add y 25
+mul y x
+add y 1
+mul z y
+mul y 0
+add y w
+add y 12
+mul y x
+add z y
+
+inp w
+mul x 0
+add x z
+mod x 26
+div z 1
+add x 11
+eql x w
+eql x 0
+mul y 0
+add y 25
+mul y x
+add y 1
+mul z y
+mul y 0
+add y w
+add y 15
+mul y x
+add z y
+
+inp w
+mul x 0
+add x z
+mod x 26
+div z 26
+add x -15
+eql x w
+eql x 0
+mul y 0
+add y 25
+mul y x
+add y 1
+mul z y
+mul y 0
+add y w
+add y 9
+mul y x
+add z y
+
+inp w
+mul x 0
+add x z
+mod x 26
+div z 26
+add x -9
+eql x w
+eql x 0
+mul y 0
+add y 25
+mul y x
+add y 1
+mul z y
+mul y 0
+add y w
+add y 12
+mul y x
+add z y
+
+inp w
+mul x 0
+add x z
+mod x 26
+div z 26
+add x -3
+eql x w
+eql x 0
+mul y 0
+add y 25
+mul y x
+add y 1
+mul z y
+mul y 0
+add y w
+add y 12
+mul y x
+add z y
