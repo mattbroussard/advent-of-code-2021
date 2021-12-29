@@ -1,0 +1,67 @@
+C2 -> right hall - 3 (300)
+D2 -> right hall - 6 (6000)
+A2 -> room 2     - 7 (7)
+D2 -> room 4     - 3 (3000)
+D1 -> room 4     - 8 (8000)
+C1 -> right hall - 2 (200)
+B2 -> room 1     - 7 (70)
+C1 -> room 3     - 3 (300)
+C2 -> room 3     - 5 (500)
+
+300+6000+7+3000+8000+200+70+300+500=18377 wrong
+
+------
+
+#############
+#...........#
+###D#D#C#C###
+  #B#A#B#A#
+  #########
+
+#############
+#..X.X.X.X..#
+###.#.#.#.###
+  #.#.#.#.#
+  #########
+
+room1 = ...
+room2 = ...
+room3 = ...
+room4 = ...
+rooms = room1 + room2 + room3 + room4
+
+hall = ...
+roomN -> hall + room(except N)
+hall -> rooms
+
+misc rules:
+ - max steps: 2
+ - no going to top room slot if bottom is open
+ - cannot go to occupied slot
+ - cannot pass through occupied slot
+
+max depth: 16 steps (2 each for 8 agents)
+max breadth: 10 (7 hall + 3 other home) per agent; 80 max, realistically much smaller?
+
+cost fn:
+ - manually define? (manhattan distance except when both in rooms?)
+ - or map names to coords and do a cached dfs on raw map?
+
+heuristic:
+ - start with 0? -- reddit says heuristic not really needed
+ - ...
+
+win condition:
+ - all agents in rooms
+ - each agent's neighboring agent is same type
+
+state rep:
+ - cost so far
+ - map: agent pos -> agent type
+ - map: agent pos -> step count
+
+part 2:
+ - doubled height rooms?
+ - a fifth type of agent "E"?
+ - different starting positions
+
