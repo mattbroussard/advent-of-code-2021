@@ -81,7 +81,7 @@ def rotate_and_translate(vec, rotation_type, translation):
   return tuple(a + b for a, b in zip(rotate(vec, rotation_type), translation))
 
 def rotation_types():
-  return range(23)
+  return range(24)
 
 def apply_multiple_transforms(vec, transforms):
   for rot, translate, *_ in transforms:
@@ -211,6 +211,9 @@ class Scanner:
       most_frequent_translation = max(translation_histogram.keys(), key=lambda k: translation_histogram[k])
       num_common_points = translation_histogram[most_frequent_translation]
       if num_common_points < 12:
+        if num_common_points > 1:
+          # print("scanner %s -> %s, rot=%d: %d common points" % (self.scanner_id, other.scanner_id, rot_type, num_common_points))
+          pass
         continue
 
       return rot_type, most_frequent_translation, num_common_points
