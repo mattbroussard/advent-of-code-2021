@@ -285,34 +285,55 @@ def part1_compute_edges(scanners):
 
   return links
 
+def path_from_links(i, links):
+  if i == 0:
+    return []
+  for edge, transform in links.items():
+    a, b = edge
+    if a == i:
+      return [transform] + path_from_links(b, links)
+
 def part1():
   scanners = read_file()
   links = part1_compute_edges(scanners)
-
   # We hit an error in part1_compute_edges that caused it to not find intersections between all scanners
   if len(links) != len(scanners) - 1:
-    return
-
-  def path_from_links(i):
-    if i == 0:
-      return []
-    for edge, transform in links.items():
-      a, b = edge
-      if a == i:
-        return [transform] + path_from_links(b)
+    return None, None
 
   pts = set()
   for i, scanner in enumerate(scanners):
-    transform_path = path_from_links(i)
+    transform_path = path_from_links(i, links)
     for pt in scanner.points.values():
       pts.add(apply_multiple_transforms(pt, transform_path))
 
   print("Total number of points: %d" % (len(pts),))
+  return scanners, links
+
+def manhattan(a, b):
+  return sum(abs(x-y) for x, y in zip(a, b))
+
+def part2(scanners, links):
+  if scanners is None or links is None:
+    print("can't do part 2 with error in part 1")
+    return
+
+  origin = (0, 0, 0)
+  pts = set()
+  for i, scanner in enumerate(scanners):
+    transform_path = path_from_links(i, links)
+    pts.add(apply_multiple_transforms(origin, transform_path))
+
+  max_manhattan = 0
+  for a, b in product(pts, pts):
+    max_manhattan = max(max_manhattan, manhattan(a, b))
+
+  print("Max manhattan distance: %d" % (max_manhattan,))
 
 def main():
   # test_orientations()
   # test_single_intersection()
-  part1()
+  scanners, links = part1()
+  part2(scanners, links)
 
 if __name__ == '__main__':
   main()
