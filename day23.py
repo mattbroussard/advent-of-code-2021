@@ -459,15 +459,27 @@ def solve(input_str):
   return -1
 
 def main():
-  part = int(sys.argv[1]) if len(sys.argv) >= 2 else None
+  map_name = sys.argv[1] if len(sys.argv) >= 2 else None
+  known_maps = {
+    "part1_sample_map": part1_sample_map,
+    "part1_puzzle_map": part1_puzzle_map,
+    "part1_super_easy": part1_super_easy,
+    "part2_sample_map": part2_sample_map,
+    "part2_puzzle_map": part2_puzzle_map,
+    "part2_super_easy": part2_super_easy,
+  }
 
-  if part == 1 or part is None:
-    p1_result = solve(part1_puzzle_map)
-    print("Part 1 result: %d" % (p1_result,))
+  map_to_solve = None
+  if map_name is not None and map_name in known_maps:
+    map_to_solve = known_maps[map_name]
+    print("Solving map %s" % (map_name,))
+  else:
+    default_map = 'part2_puzzle_map'
+    map_to_solve = known_maps[default_map]
+    print("Unknown map name %s, defaulting to %s" % (map_name, default_map))
 
-  if part == 2 or part is None:
-    p2_result = solve(part2_super_easy)
-    print("Part 2 result: %d" % (p2_result,))
+  result = solve(map_to_solve)
+  print("Result: %d" % (result,))
 
 if __name__ == '__main__':
   main()
