@@ -5,6 +5,8 @@ from copy import deepcopy
 import heapq
 from collections import defaultdict, deque
 from functools import cache
+import sys
+from itertools import zip_longest
 
 part1_empty_map = """
 #############
@@ -38,36 +40,126 @@ part1_super_easy = """
   #########
 """[1:-1]
 
+part2_empty_map = """
+#############
+#...........#
+###.#.#.#.###
+  #.#.#.#.#__
+  #.#.#.#.#__
+  #.#.#.#.#__
+  #########__
+"""[1:-1].replace("_", " ")
+
+part2_sample_map = """
+#############
+#...........#
+###B#C#B#D###
+  #D#C#B#A#
+  #D#B#A#C#
+  #A#D#C#A#
+  #########
+"""[1:-1]
+
+part2_puzzle_map = """
+#############
+#...........#
+###D#D#C#C###
+  #D#C#B#A#
+  #D#B#A#C#
+  #B#A#B#A#
+  #########
+"""[1:-1]
+
+part2_super_easy = """
+#############
+#...........#
+###B#A#C#D###
+  #A#B#C#D#
+  #A#B#C#D#
+  #A#B#C#D#
+  #########
+"""[1:-1]
+
 # Define which coordinates correspond to rooms and hall
-p1_room1 = [(3, 2), (3, 3)]
-p1_room2 = [(5, 2), (5, 3)]
-p1_room3 = [(7, 2), (7, 3)]
-p1_room4 = [(9, 2), (9, 3)]
+p2_room1 = [(3, 2), (3, 3), (3, 4), (3, 5)]
+p1_room1 = p2_room1[:2]
+p2_room2 = [(5, 2), (5, 3), (5, 4), (5, 5)]
+p1_room2 = p2_room2[:2]
+p2_room3 = [(7, 2), (7, 3), (7, 4), (7, 5)]
+p1_room3 = p2_room3[:2]
+p2_room4 = [(9, 2), (9, 3), (9, 4), (9, 5)]
+p1_room4 = p2_room4[:2]
 p1_rooms_separate = [p1_room1, p1_room2, p1_room3, p1_room4]
+p2_rooms_separate = [p2_room1, p2_room2, p2_room3, p2_room4]
 p1_rooms = [pos for room in p1_rooms_separate for pos in room]
+p2_rooms = [pos for room in p2_rooms_separate for pos in room]
 p1_rooms_set = set(p1_rooms)
+p2_rooms_set = set(p2_rooms)
 p1_rooms_x = set(x for x, _ in p1_rooms)
 p1_hall = [(x, 1) for x in range(1,12) if x not in p1_rooms_x]
 
 # Constants related to other rules
 per_move_costs = {'A': 1, 'B': 10, 'C': 100, 'D': 1000}
-# per_move_costs = {k: 1 for k in 'ABCD'}
 
 def p1_room_num(idx_into_p1_rooms):
   return idx_into_p1_rooms // len(p1_room1)
 
+def p2_room_num(idx_into_p2_rooms):
+  return idx_into_p2_rooms // len(p2_room1)
+
 # Define possible transitions between different positions
 p1_transitions = defaultdict(list)
+p2_transitions = defaultdict(list)
 for h in p1_hall:
   p1_transitions[h] += p1_rooms
+  p2_transitions[h] += p2_rooms
 for i, r in enumerate(p1_rooms):
   p1_transitions[r] += p1_hall
   for j in range(len(p1_rooms)):
     if p1_room_num(i) != p1_room_num(j):
       p1_transitions[r].append(p1_rooms[j])
+for i, r in enumerate(p2_rooms):
+  p2_transitions[r] += p1_hall
+  for j in range(len(p2_rooms)):
+    if p2_room_num(i) != p2_room_num(j):
+      p2_transitions[r].append(p2_rooms[j])
+
+class PuzzleParams:
+  def __init__(self, empty_map):
+    self.rooms_x = p1_rooms_x
+    self.hall = p1_hall
+    self.per_move_costs = per_move_costs
+    self.empty_map = empty_map
+
+    if empty_map == part1_empty_map:
+      self.room1 = p1_room1
+      self.room2 = p1_room2
+      self.room3 = p1_room3
+      self.room4 = p1_room4
+      self.rooms_separate = p1_rooms_separate
+      self.rooms = p1_rooms
+      self.rooms_set = p1_rooms_set
+      self.transitions = p1_transitions
+    elif empty_map == part2_empty_map:
+      self.room1 = p2_room1
+      self.room2 = p2_room2
+      self.room3 = p2_room3
+      self.room4 = p2_room4
+      self.rooms_separate = p2_rooms_separate
+      self.rooms = p2_rooms
+      self.rooms_set = p2_rooms_set
+      self.transitions = p2_transitions
+    else:
+      raise Exception('invalid input to PuzzleParams')
+
+  def room_num(self, idx_into_rooms):
+    if self.empty_map == part1_empty_map:
+      return p1_room_num(idx_into_rooms)
+    else:
+      return p2_room_num(idx_into_rooms)
 
 @cache
-def pathfind_empty(src, dst, empty_map=part1_empty_map):
+def pathfind_empty(src, dst, empty_map):
   lines = empty_map.splitlines()
   width = len(lines[0])
   height = len(lines)
@@ -98,7 +190,8 @@ def pathfind_empty(src, dst, empty_map=part1_empty_map):
 
   raise Exception("pathfind_empty couldn't find a route %s -> %s" % (src, dst))
 
-keep_history = True
+keep_history = False
+keep_visited = False
 
 class State:
   # map: agent type -> list(tuple(coord, step_count))
@@ -110,16 +203,19 @@ class State:
   # only populated if keep_history==True
   prev_state = None
 
+  params = None
+
   # This constructor clones by default, then modifications can be made
   # subsequently by the caller
   def __init__(self, other=None):
     if other is not None:
       self.agent_states = deepcopy(other.agent_states)
       self.cost_so_far = other.cost_so_far
+      self.params = other.params
       if keep_history:
         self.prev_state = other
 
-  def is_winning_p1(self):
+  def is_winning(self):
     # map: agent type -> list(room num)
     room_assignments = defaultdict(list)
 
@@ -130,9 +226,9 @@ class State:
           return False
 
         # Every agent must be in a room
-        if pos not in p1_rooms_set:
+        if pos not in self.params.rooms_set:
           return False
-        room_assignments[agent_type].append(p1_room_num(p1_rooms.index(pos)))
+        room_assignments[agent_type].append(self.params.room_num(self.params.rooms.index(pos)))
 
     for agent_type, expected_room in zip(sorted(room_assignments.keys()), range(len(room_assignments))):
       v = room_assignments[agent_type]
@@ -146,7 +242,7 @@ class State:
 
     return True
 
-  def get_successors_p1(self):
+  def get_successors(self):
     # assumption: already checked not winning before calling get_successors
 
     for agent_type, states in self.agent_states.items():
@@ -159,7 +255,7 @@ class State:
         if self.last_agent_to_move == (agent_type, agent_idx):
           continue
 
-        for next_pos in p1_transitions[pos]:
+        for next_pos in self.params.transitions[pos]:
           # Can't backtrack from the direction that destination is in
           # TODO: not sure if this rule is actually correct?
           # if self.is_move_in_wrong_direction(pos, next_pos, agent_type):
@@ -177,7 +273,7 @@ class State:
             continue
 
           # Path to the next space may not contain any other agent
-          path = pathfind_empty(pos, next_pos, part1_empty_map)
+          path = pathfind_empty(pos, next_pos, self.params.empty_map)
           if self.path_collides(path):
             continue
 
@@ -207,12 +303,12 @@ class State:
     return sorted(self.agent_states.keys()).index(agent_type)
 
   def is_illegal_room_destination(self, pos, agent_type):
-    if pos not in p1_rooms_set:
+    if pos not in self.params.rooms_set:
       return False
 
     expected_room = self.expected_room_for_agent_type(agent_type)
 
-    for room_idx, room in enumerate(p1_rooms_separate):
+    for room_idx, room in enumerate(self.params.rooms_separate):
       if pos not in room:
         continue
 
@@ -240,7 +336,7 @@ class State:
   # This rule sped things up a lot, but turned out to be wrong and gives wrong answer for part 1 puzzle input.
   # def is_move_in_wrong_direction(self, pos, next_pos, agent_type):
   #   expected_room = self.expected_room_for_agent_type(agent_type)
-  #   expected_x = p1_rooms_separate[expected_room][0][0]
+  #   expected_x = self.params.rooms_separate[expected_room][0][0]
 
   #   # entering desired room
   #   if expected_x == next_pos[0]:
@@ -265,7 +361,7 @@ class State:
     return self.cost_so_far < other.cost_so_far
 
   def hash_tuple(self):
-    # prev_state pointer intentionally not part of hash_tuple
+    # prev_state pointer and params intentionally not part of hash_tuple
     ht = (self.cost_so_far, self.last_agent_to_move)
     for key in sorted(self.agent_states.keys()):
       for agent_state in self.agent_states[key]:
@@ -279,7 +375,7 @@ class State:
     return hash(self.hash_tuple())
 
   def __str__(self):
-    lines = [list(line) for line in part1_empty_map.splitlines()]
+    lines = [list(line) for line in self.params.empty_map.splitlines()]
     for agent_type, states in self.agent_states.items():
       for (x, y), _ in states:
         lines[y][x] = agent_type
@@ -300,7 +396,7 @@ class State:
     ]
 
     lines = ["".join(line) for line in lines]
-    return "\n".join((a or "") + (b or "") for a,b in zip(lines, stat_lines))
+    return "\n".join(a+b for a,b in zip_longest(lines, stat_lines, fillvalue=""))
 
   def get_full_history(self):
     cur = self
@@ -315,6 +411,9 @@ def input_str_to_initial_state(input_str):
   agents = defaultdict(list)
 
   lines = input_str.splitlines()
+  is_part2 = len(lines) == 7
+  empty = part2_empty_map if is_part2 else part1_empty_map
+
   for y, line in enumerate(lines):
     for x, c in enumerate(line):
       if c in 'ABCD':
@@ -322,9 +421,10 @@ def input_str_to_initial_state(input_str):
 
   state = State()
   state.agent_states = dict(agents)
+  state.params = PuzzleParams(empty)
   return state
 
-def part1(input_str):
+def solve(input_str):
   initial_state = input_str_to_initial_state(input_str)
 
   frontier = [(initial_state.cost_so_far, initial_state)]
@@ -334,7 +434,7 @@ def part1(input_str):
     iterations += 1
     _, cur = heapq.heappop(frontier)
 
-    if cur.is_winning_p1():
+    if cur.is_winning():
       win_history = cur.get_full_history()
       print("Winning strategy (%d steps):" % (len(win_history)))
       for state in win_history:
@@ -345,9 +445,10 @@ def part1(input_str):
     # This method will handle filtering for valid successors only.
     # It is also defined such that no cycles are possible, though separately
     # reached and equivalent states are possible so we still keep a visited set
-    for successor in cur.get_successors_p1():
+    for successor in cur.get_successors():
       if successor not in visited:
-        visited.add(successor)
+        if keep_visited:
+          visited.add(successor)
         heapq.heappush(frontier, (successor.cost_so_far, successor))
 
     if iterations % 1000 == 0:
@@ -358,8 +459,15 @@ def part1(input_str):
   return -1
 
 def main():
-  p1_result = part1(part1_puzzle_map)
-  print("Part 1 result: %d" % (p1_result,))
+  part = int(sys.argv[1]) if len(sys.argv) >= 2 else None
+
+  if part == 1 or part is None:
+    p1_result = solve(part1_puzzle_map)
+    print("Part 1 result: %d" % (p1_result,))
+
+  if part == 2 or part is None:
+    p2_result = solve(part2_super_easy)
+    print("Part 2 result: %d" % (p2_result,))
 
 if __name__ == '__main__':
   main()
