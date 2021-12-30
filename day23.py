@@ -43,13 +43,15 @@ p1_room1 = [(3, 2), (3, 3)]
 p1_room2 = [(5, 2), (5, 3)]
 p1_room3 = [(7, 2), (7, 3)]
 p1_room4 = [(9, 2), (9, 3)]
-p1_rooms = p1_room1 + p1_room2 + p1_room3 + p1_room4
+p1_rooms_separate = [p1_room1, p1_room2, p1_room3, p1_room4]
+p1_rooms = [pos for room in p1_rooms_separate for pos in room]
 p1_rooms_set = set(p1_rooms)
 p1_rooms_x = set(x for x, _ in p1_rooms)
 p1_hall = [(x, 1) for x in range(1,12) if x not in p1_rooms_x]
 
 # Constants related to other rules
 per_move_costs = {'A': 1, 'B': 10, 'C': 100, 'D': 1000}
+# per_move_costs = {k: 1 for k in 'ABCD'}
 
 def p1_room_num(idx_into_p1_rooms):
   return idx_into_p1_rooms // len(p1_room1)
@@ -102,6 +104,8 @@ class State:
   # map: agent type -> list(tuple(coord, step_count))
   agent_states = None
   cost_so_far = 0
+  # tuple: (agent_type, agent_idx)
+  last_agent_to_move = None
 
   # only populated if keep_history==True
   prev_state = None
@@ -124,19 +128,26 @@ class State:
         if steps > 2:
           raise Exception("ERROR: found an agent that has moved more than 2 times (%s%d)" % (agent_type, i))
           return False
+
+        # Every agent must be in a room
         if pos not in p1_rooms_set:
           return False
         room_assignments[agent_type].append(p1_room_num(p1_rooms.index(pos)))
 
-    for v in room_assignments.values():
+    for agent_type, expected_room in zip(sorted(room_assignments.keys()), range(len(room_assignments))):
+      v = room_assignments[agent_type]
+      # Agents must be arranged alphabetically from left to right
+      if v[0] != expected_room:
+        return False
+
+      # Every room must contain just one type of agent
       if len(set(v)) != 1:
         return False
 
     return True
 
   def get_successors_p1(self):
-    if self.is_winning_p1():
-      return
+    # assumption: already checked not winning before calling get_successors
 
     for agent_type, states in self.agent_states.items():
       for agent_idx, (pos, steps) in enumerate(states):
@@ -144,12 +155,28 @@ class State:
         if steps >= 2:
           continue
 
+        # Same agent cannot move twice consecutively
+        if self.last_agent_to_move == (agent_type, agent_idx):
+          continue
+
         for next_pos in p1_transitions[pos]:
-          if self.position_collides(next_pos):
-            continue
-          if self.is_suboptimal_room_slot_p1(next_pos):
+          # Can't backtrack from the direction that destination is in
+          # TODO: not sure if this rule is actually correct?
+          if self.is_move_in_wrong_direction(pos, next_pos, agent_type):
             continue
 
+          # Can't go someplace another agent is already
+          if self.position_collides(next_pos):
+            continue
+
+          # If entering a room:
+          #  - must go to bottom-most open slot
+          #  - cannot enter a room that contains a different agent type
+          #  - rooms must be arranged alphabetically
+          if self.is_illegal_room_destination(next_pos, agent_type):
+            continue
+
+          # Path to the next space may not contain any other agent
           path = pathfind_empty(pos, next_pos, part1_empty_map)
           if self.path_collides(path):
             continue
@@ -157,13 +184,18 @@ class State:
           new_state = State(self)
           new_state.agent_states[agent_type][agent_idx] = (next_pos, steps + 1)
           new_state.cost_so_far += len(path) * per_move_costs[agent_type]
+          new_state.last_agent_to_move = (agent_type, agent_idx)
           yield new_state
 
+  def agent_at(self, pos):
+    for agent_type, states in self.agent_states.items():
+      for i, (coord, _) in enumerate(states):
+        if pos == coord:
+          return (agent_type, i)
+    return None
+
   def position_collides(self, pos):
-    for coord, _ in self.agent_states.values():
-      if pos == coord:
-        return True
-    return False
+    return self.agent_at(pos) is not None
 
   def path_collides(self, path):
     for pos in path:
@@ -171,29 +203,69 @@ class State:
         return True
     return False
 
-  def is_suboptimal_room_slot_p1(self, pos):
+  def expected_room_for_agent_type(self, agent_type):
+    return sorted(self.agent_states.keys()).index(agent_type)
+
+  def is_illegal_room_destination(self, pos, agent_type):
     if pos not in p1_rooms_set:
       return False
 
-    for room in [p1_room1, p1_room2, p1_room3, p1_room4]:
+    expected_room = self.expected_room_for_agent_type(agent_type)
+
+    for room_idx, room in enumerate(p1_rooms_separate):
       if pos not in room:
         continue
 
+      # Agents must be arranged alphabetically into the rooms
+      if room_idx != expected_room:
+        return True
+
       best_open_idx = max(range(len(room)), key=lambda i: i if not self.position_collides(room[i]) else -100)
       if best_open_idx >= 0:
+        # If a different agent type is already in this room, don't let this one enter
+        if best_open_idx < len(room) - 1:
+          first_into_room_agent_type, _ = self.agent_at(room[-1])
+          if first_into_room_agent_type != agent_type:
+            return True
+
+        # Don't enter a room without going all the way in
         return pos != room[best_open_idx]
 
       break
 
     # This probably means this method was called on a room pos that's already full?
-    raise Exception("is_suboptimal_room_slot_p1 invalid state: pos=%s" % (pos,))
+    raise Exception("is_illegal_room_destination invalid state: pos=%s" % (pos,))
     return False
+
+  def is_move_in_wrong_direction(self, pos, next_pos, agent_type):
+    expected_room = self.expected_room_for_agent_type(agent_type)
+    expected_x = p1_rooms_separate[expected_room][0][0]
+
+    # entering desired room
+    if expected_x == next_pos[0]:
+      return False
+
+    # Technically, this means leaving the column we will eventually be in and would be "backtracking",
+    # but we allow it here because:
+    #  1) it would cause div-by-0 below
+    #  2) might need to temporarily move out of the way to let a different agent under you get out
+    if expected_x == pos[0]:
+      return False
+
+    expected_dir = expected_x - pos[0]
+    expected_dir /= abs(expected_dir)
+
+    actual_dir = next_pos[0] - pos[0]
+    actual_dir /= abs(actual_dir)
+
+    return expected_dir != actual_dir
 
   def __lt__(self, other):
     return self.cost_so_far < other.cost_so_far
 
   def hash_tuple(self):
-    ht = (self.cost_so_far,)
+    # prev_state pointer intentionally not part of hash_tuple
+    ht = (self.cost_so_far, self.last_agent_to_move)
     for key in sorted(self.agent_states.keys()):
       for agent_state in self.agent_states[key]:
         ht += (agent_state,)
@@ -212,10 +284,15 @@ class State:
         lines[y][x] = agent_type
 
     stat_lines = [
-      "  total cost: %d" % (self.cost_so_far,)
+      "  total cost: %d" % (self.cost_so_far)
     ] + [
       "  " + "  ".join(
-        "%s%s: %d" % (agent_type, i, steps)
+        "%s%s%s: %d" % (
+          "*" if (agent_type, i) == self.last_agent_to_move else " ",
+          agent_type,
+          i,
+          steps
+        )
         for i, (_, steps) in enumerate(self.agent_states[agent_type])
       )
       for agent_type in sorted(self.agent_states.keys())
@@ -280,7 +357,7 @@ def part1(input_str):
   return -1
 
 def main():
-  p1_result = part1(part1_super_easy)
+  p1_result = part1(part1_sample_map)
   print("Part 1 result: %d" % (p1_result,))
 
 if __name__ == '__main__':
