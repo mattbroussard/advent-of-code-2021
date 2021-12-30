@@ -162,8 +162,8 @@ class State:
         for next_pos in p1_transitions[pos]:
           # Can't backtrack from the direction that destination is in
           # TODO: not sure if this rule is actually correct?
-          if self.is_move_in_wrong_direction(pos, next_pos, agent_type):
-            continue
+          # if self.is_move_in_wrong_direction(pos, next_pos, agent_type):
+          #   continue
 
           # Can't go someplace another agent is already
           if self.position_collides(next_pos):
@@ -237,28 +237,29 @@ class State:
     raise Exception("is_illegal_room_destination invalid state: pos=%s" % (pos,))
     return False
 
-  def is_move_in_wrong_direction(self, pos, next_pos, agent_type):
-    expected_room = self.expected_room_for_agent_type(agent_type)
-    expected_x = p1_rooms_separate[expected_room][0][0]
+  # This rule sped things up a lot, but turned out to be wrong and gives wrong answer for part 1 puzzle input.
+  # def is_move_in_wrong_direction(self, pos, next_pos, agent_type):
+  #   expected_room = self.expected_room_for_agent_type(agent_type)
+  #   expected_x = p1_rooms_separate[expected_room][0][0]
 
-    # entering desired room
-    if expected_x == next_pos[0]:
-      return False
+  #   # entering desired room
+  #   if expected_x == next_pos[0]:
+  #     return False
 
-    # Technically, this means leaving the column we will eventually be in and would be "backtracking",
-    # but we allow it here because:
-    #  1) it would cause div-by-0 below
-    #  2) might need to temporarily move out of the way to let a different agent under you get out
-    if expected_x == pos[0]:
-      return False
+  #   # Technically, this means leaving the column we will eventually be in and would be "backtracking",
+  #   # but we allow it here because:
+  #   #  1) it would cause div-by-0 below
+  #   #  2) might need to temporarily move out of the way to let a different agent under you get out
+  #   if expected_x == pos[0]:
+  #     return False
 
-    expected_dir = expected_x - pos[0]
-    expected_dir /= abs(expected_dir)
+  #   expected_dir = expected_x - pos[0]
+  #   expected_dir /= abs(expected_dir)
 
-    actual_dir = next_pos[0] - pos[0]
-    actual_dir /= abs(actual_dir)
+  #   actual_dir = next_pos[0] - pos[0]
+  #   actual_dir /= abs(actual_dir)
 
-    return expected_dir != actual_dir
+  #   return expected_dir != actual_dir
 
   def __lt__(self, other):
     return self.cost_so_far < other.cost_so_far
@@ -357,7 +358,7 @@ def part1(input_str):
   return -1
 
 def main():
-  p1_result = part1(part1_sample_map)
+  p1_result = part1(part1_puzzle_map)
   print("Part 1 result: %d" % (p1_result,))
 
 if __name__ == '__main__':
