@@ -95,7 +95,7 @@ p1_rooms = [pos for room in p1_rooms_separate for pos in room]
 p2_rooms = [pos for room in p2_rooms_separate for pos in room]
 p1_rooms_set = set(p1_rooms)
 p2_rooms_set = set(p2_rooms)
-p1_rooms_x = set(x for x, _ in p1_rooms)
+p1_rooms_x = [3, 5, 7, 9]
 p1_hall = [(x, 1) for x in range(1,12) if x not in p1_rooms_x]
 
 # Constants related to other rules
@@ -194,20 +194,31 @@ keep_history = False
 keep_visited = False
 
 class State:
+  __slots__ = ("agent_states", "cost_so_far", "last_agent_to_move", "prev_state", "params")
+
   # map: agent type -> list(tuple(coord, step_count))
-  agent_states = None
-  cost_so_far = 0
+  # agent_states = None
+  # cost_so_far = 0
+
   # tuple: (agent_type, agent_idx)
-  last_agent_to_move = None
+  # last_agent_to_move = None
 
   # only populated if keep_history==True
-  prev_state = None
+  # prev_state = None
 
-  params = None
+  # params = None
 
   # This constructor clones by default, then modifications can be made
   # subsequently by the caller
   def __init__(self, other=None):
+    # Must do this default init in __init__, not as class variables, when using __slots__
+    # https://stackoverflow.com/a/41893938
+    self.agent_states = None
+    self.cost_so_far = 0
+    self.last_agent_to_move = None
+    self.prev_state = None
+    self.params = None
+
     if other is not None:
       self.agent_states = deepcopy(other.agent_states)
       self.cost_so_far = other.cost_so_far
@@ -255,6 +266,8 @@ class State:
         if self.last_agent_to_move == (agent_type, agent_idx):
           continue
 
+        # ideal_hall_positions = self.compute_ideal_hall_positions(agent_type)
+
         for next_pos in self.params.transitions[pos]:
           # Can't backtrack from the direction that destination is in
           # TODO: not sure if this rule is actually correct?
@@ -264,6 +277,11 @@ class State:
           # Can't go someplace another agent is already
           if self.position_collides(next_pos):
             continue
+
+          # If going to the hall, must go to an "ideal hall position" -- closest
+          # open slots to final destination room
+          # if next_pos not in self.params.rooms_set and next_pos not in ideal_hall_positions:
+          #   continue
 
           # If entering a room:
           #  - must go to bottom-most open slot
@@ -283,6 +301,71 @@ class State:
           new_state.last_agent_to_move = (agent_type, agent_idx)
           yield new_state
 
+  def get_successors_v2(self):
+    room_contents = [
+      [x for x in [self.agent_at(pos) for pos in reversed(room)] if x is not None]
+      for room in self.params.rooms_separate
+    ]
+
+    # Step 1: Try to move agent from front of each room out, if room needs any
+    # changes
+    for room_num, room in enumerate(room_contents):
+      expected_agent = 'ABCD'[room_num]
+      any_to_move = any(agent_type != expected_agent for agent_type, _ in room)
+      if not any_to_move:
+        continue
+
+      front_of_room = self.params.rooms_separate[room_num][0]
+      accessible_hall_slots = list(filter(
+        lambda pos: \
+          not self.position_collides(pos) and \
+          not self.path_collides(pathfind_empty(front_of_room, pos, self.params.empty_map)),
+        self.params.hall
+      ))
+
+      leader_type, leader_idx = room[-1]
+      leader_pos = self.agent_states[leader_type][leader_idx][0]
+      _, old_steps = self.agent_states[leader_type][leader_idx]
+      if old_steps != 0:
+        raise Exception('gs_v2: room %d leader %s%s has more than 0 steps already: %s' % (room_num, leader_type, leader_idx, self))
+
+      for dest in accessible_hall_slots:
+        path = pathfind_empty(leader_pos, dest, self.params.empty_map)
+        cost = len(path) * per_move_costs[leader_type]
+
+        new_state = State(self)
+        new_state.agent_states[leader_type][leader_idx] = (dest, old_steps + 1)
+        new_state.cost_so_far += cost
+        yield new_state
+
+    # Step 2: Try to move any agents in hallway into their final positions
+    for hall_pos in self.params.hall:
+      agent = self.agent_at(hall_pos)
+      if agent is None:
+        continue
+      agent_type, agent_idx = agent
+      agent_pos, agent_steps = self.agent_states[agent_type][agent_idx]
+      if agent_steps != 1:
+        raise Exception('gs_v2: agent %s%s in hall has wrong number of steps (%s): %s' % (agent_type, agent_idx, agent_steps, self))
+
+      room_num = self.expected_room_for_agent_type(agent_type)
+      room = room_contents[room_num]
+      any_to_move = any(room_agent_type != agent_type for room_agent_type, _ in room)
+      if any_to_move:
+        continue
+
+      dest = self.params.rooms_separate[room_num][-1 - len(room)]
+      path = pathfind_empty(agent_pos, dest, self.params.empty_map)
+      if self.path_collides(path):
+        continue
+
+      cost = len(path) * per_move_costs[agent_type]
+      new_state = State(self)
+      new_state.cost_so_far += cost
+      new_state.agent_states[agent_type][agent_idx] = (dest, agent_steps + 1)
+      yield new_state
+
+
   def agent_at(self, pos):
     for agent_type, states in self.agent_states.items():
       for i, (coord, _) in enumerate(states):
@@ -298,6 +381,13 @@ class State:
       if self.position_collides(pos):
         return True
     return False
+
+  # This gave exhausted search space without a solution :(
+  # def compute_ideal_hall_positions(self, agent_type):
+  #   desired_x = self.params.rooms_x[self.expected_room_for_agent_type(agent_type)]
+  #   positions = {pos: abs(pos[0] - desired_x) for pos in self.params.hall if not self.position_collides(pos)}
+  #   min_dist = min(positions.values())
+  #   return [pos for pos, dist in positions.items() if dist == min_dist]
 
   def expected_room_for_agent_type(self, agent_type):
     return sorted(self.agent_states.keys()).index(agent_type)
@@ -396,7 +486,10 @@ class State:
     ]
 
     lines = ["".join(line) for line in lines]
-    return "\n".join(a+b for a,b in zip_longest(lines, stat_lines, fillvalue=""))
+    return "\n" + "\n".join(a+b for a,b in zip_longest(lines, stat_lines, fillvalue=""))
+
+  def __repr__(self):
+    return self.__str__()
 
   def get_full_history(self):
     cur = self
@@ -445,7 +538,17 @@ def solve(input_str):
     # This method will handle filtering for valid successors only.
     # It is also defined such that no cycles are possible, though separately
     # reached and equivalent states are possible so we still keep a visited set
-    for successor in cur.get_successors():
+    successors = list(cur.get_successors_v2())
+    # successors_old = list(cur.get_successors())
+
+    # # debug
+    # if set(successors) != set(successors_old):
+    #   print('ERROR: v1 and v2 successor functions mismatch')
+    #   print(successors)
+    #   print('----------------------------------------------')
+    #   print(successors_old)
+
+    for successor in successors:
       if successor not in visited:
         if keep_visited:
           visited.add(successor)
