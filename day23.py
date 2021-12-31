@@ -191,7 +191,6 @@ def pathfind_empty(src, dst, empty_map):
   raise Exception("pathfind_empty couldn't find a route %s -> %s" % (src, dst))
 
 keep_history = False
-keep_visited = False
 
 class State:
   __slots__ = ("agent_states", "cost_so_far", "last_agent_to_move", "prev_state", "params")
@@ -464,6 +463,13 @@ class State:
   def __hash__(self):
     return hash(self.hash_tuple())
 
+  def get_map_string(self):
+    lines = [list(line) for line in self.params.empty_map.splitlines()]
+    for agent_type, states in self.agent_states.items():
+      for (x, y), _ in states:
+        lines[y][x] = agent_type
+    return "\n".join("".join(line) for line in lines)
+
   def __str__(self):
     lines = [list(line) for line in self.params.empty_map.splitlines()]
     for agent_type, states in self.agent_states.items():
@@ -521,7 +527,7 @@ def solve(input_str):
   initial_state = input_str_to_initial_state(input_str)
 
   frontier = [(initial_state.cost_so_far, initial_state)]
-  visited = set([initial_state])
+  visited = {initial_state.get_map_string(): 0}
   iterations = 0
   while len(frontier) > 0:
     iterations += 1
@@ -549,9 +555,9 @@ def solve(input_str):
     #   print(successors_old)
 
     for successor in successors:
-      if successor not in visited:
-        if keep_visited:
-          visited.add(successor)
+      ms = successor.get_map_string()
+      if ms not in visited or visited[ms] > successor.cost_so_far:
+        visited[ms] = successor.cost_so_far
         heapq.heappush(frontier, (successor.cost_so_far, successor))
 
     if iterations % 1000 == 0:
